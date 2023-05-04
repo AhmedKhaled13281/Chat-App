@@ -1,0 +1,131 @@
+Chat App Documentation (Logic)
+
+#First : Create A Collection For : User , Conversation and Message
+
+ A : Conversation :-
+	
+     The conversation collection will be containd an array called members that
+     include : the SenderId and The ReceiverId .
+
+     POST : http://localhost:8800/api/conversations
+	
+	So in Frontend we send in body request the SenderId and The ReceiverId to
+	create a conversation between the user (that has logged in successfully) and the other user (Seller)
+	
+     const data = {
+      senderId: userData?._id,
+      receiverId: sellerData?._id,
+     };
+
+	GET : http://localhost:8800/api/conversations/${_id}
+
+	The Frontend send the userId (that has logged in successfully) to the endpoint to get all the
+	conversations that user has been made with other users (Sellers)
+
+	The Goal of that is to get message with the conversation ID .
+	becasue we deal with the Message collection with the conversation ID to get the messages that belong to
+	these to users
+
+	
+B : Message :-
+	
+	the message collection will be contained an conversation Id , sender Id , text and created At
+	
+	POST : http://localhost:8800/api/messages
+	
+	The Frontend will send a message object to this endpoint in the body 
+	
+	const message = {
+        sender: userData?._id,
+        text: inputValue,
+        conversationId: currentChat?._id, //current conversation
+      };
+	
+	and the response will be the same object to add it in the state management
+
+	GET : http://localhost:8800/api/messages/${currentChat?._id}
+	
+      The Frontend send the current conversationId (currentChat) to the endpoint to get all the
+	messages that user has been made with other users (Sellers) .
+
+	the response will be the message object . and i will return also the currentChat that i have sent 
+	to the endpoint
+	
+	Note : each message has an object that contain conversation Id , sender Id , text and created At
+	So if the chat with the user and the seller has 20 messages . so message array that return from 
+	the endpoint will return 20 object!
+
+
+#Second : Socket Part
+	
+	you need to install socket client : npm install socket-client 
+
+  A : Start Connection
+	const socket = io('ws://localhost:8900')
+ 	socket.on("connect" , () => {console.log("Socket Connected"})
+
+	Note : when to connect to socket . it will create a socket ID for the user and this ID is unique and change every time you refresh 
+	the page
+  
+  B : Add the user (that has logged in successfully) to the socket
+	socket.emit("addUser", _id);
+
+	Note : the Backend will create an object for you that include the socket ID and the user ID
+		{
+			socketId : 'ewfewf324erwfw',
+			userId : 'dwfwfwfwfwefwwf'
+		}
+
+  C : Send Message To Socket . The Frontend will send an message object that will contain 
+	const message = {
+          senderId: userData?._id,
+          receiverId,
+          text: inputValue,
+	}
+  	
+	socket.emit("sendMessage" , message)
+
+	Note : The receiverId will be second user in the current conversation (currentChat) . so we will
+	get this user in this way : 
+
+	const receiverId = currentChat.members.find(
+        (member) => member !== userData?._id
+      );
+
+	The Backend will retreieve this object and find the the user that match the receiverId and
+	send him and object that contain the Sender Id and the text
+	
+	// Backend Code
+	socket.on("sendMessage", ({ senderId, receiverId, text }) => {
+    		const user = getUser(receiverId);
+    		io.to(user?.socketId).emit("getMessage", {
+      		senderId,
+      		text,
+    		});
+  	});
+
+ D : Get Message From Socket , The Frontend will retrieve an object that contain the sender ID and the text .
+	Like This :
+		{
+			senderId : "645045fe77a84360d47715ef",
+			text : "ok"
+		}
+	
+	i will set this data and add to it more property : createdAt . to know the time that message has sent on it
+	
+		{
+			senderId : "645045fe77a84360d47715ef",
+			text : "ok",
+			createdAt : Data.now()
+		}
+
+	Then , i will check if there is an arrivalMessage and check if the current conversation (currentChat) include
+	the sender ID . then i will dispatch or send this arrivalMessage object to the database (Message Collection)
+	to store it .
+	
+	Like This :
+	    	arrivalMessage &&
+      	currentChat?.members.includes(arrivalMessage.sender) &&
+      	dispatch(sendMessage(arrivalMessage));
+	
+ 	
